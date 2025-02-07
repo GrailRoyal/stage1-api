@@ -1,18 +1,9 @@
 from fastapi import FastAPI, Query, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from typing import Union
 import requests
 
 app = FastAPI()
 
-# CORS Middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Helper Functions
 def is_prime(n: int) -> bool:
