@@ -1,68 +1,66 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import math
 import requests
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-def is_prime(n: int) -> bool:
-    """Check if a number is prime."""
-    if n < 2:
+class NumberResponse(BaseModel):
+    number: int
+    is_prime: bool
+    is_perfect: bool
+    properties: list
+    digit_sum: int
+    fun_fact: str
+
+def is_armstrong(number):
+    n = len(str(number))
+    return number == sum(int(digit) ** n for digit in str(number))
+
+def digit_sum(number):
+    return sum(int(digit) for digit in str(number))
+
+def is_prime(n):
+    if n <= 1:
         return False
-    for i in range(2, int(n ** 0.5) + 1):
+    for i in range(2, int(math.sqrt(n)) + 1):
         if n % i == 0:
             return False
     return True
 
-def is_armstrong(n: int) -> bool:
-    """Check if a number is an Armstrong number."""
-    digits = [int(digit) for digit in str(n)]
-    power = len(digits)
-    return sum(digit ** power for digit in digits) == n
-
-def is_perfect(n: int) -> bool:
-    """Check if a number is a Perfect number."""
+def is_perfect(n):
     return sum(i for i in range(1, n) if n % i == 0) == n
 
-def get_fun_fact(n: int) -> str:
-    """Fetch a fun fact from the Numbers API."""
-    response = requests.get(f"http://numbersapi.com/{n}/math")
-    return response.text if response.status_code == 200 else "No fun fact available."
-
-def isNumber(number):
-    try:
-        int(number)
-        return True
-    except ValueError:
-        return False
-
-@app.get("/api/classify-number/")
-def classify_number(number = Query(..., description="The number to classify")):
-    """API endpoint to classify a number."""
-
-    if not number:
-        return {"error": True, "number": "alphabet" }
-
-    if not isNumber(number):
-        return {"number": "alphabet" , "error": True}
-
+@app.get("/api/classify-number", response_model=NumberResponse)
+def classify_number(number: int):
     properties = []
-    
     if is_armstrong(number):
         properties.append("armstrong")
-    properties.append("odd" if number % 2 else "even")
 
-    return {
-    "number": number,
+    if number % 2 == 0:
+        properties.append("even")
+    else:
+        properties.append("odd")
 
-    "is_prime": is_prime(number),
+    response = requests.get(f"http://numbersapi.com/{number}/math")
+    fun_fact = response.text if response.status_code == 200 else "No fun fact found."
 
-    "is_perfect": is_perfect(number),
+    result = NumberResponse(
+        number=number,
+        is_prime=is_prime(number),
+        is_perfect=is_perfect(number),
+        properties=properties,
+        digit_sum=digit_sum(number),
+        fun_fact=fun_fact
+    )
 
-    "properties": properties,
+    return result
 
-    "digit_sum": sum(int(digit) for digit in str(number)),
-
-    "fun_fact": get_fun_fact(number)
-}
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+@app.exception_handler(ValueError)
+def value_error_handler(request, exc):
+    return JSONResponse(
+        status_code=400,
+        content={"error": True, "message": "Alphabet."}
+    )
