@@ -1,8 +1,22 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Request
 from typing import Union
 import requests
+from fastapi.responses import JSONResponse
+
+
+class UnicornException(Exception):
+    def __init__(self):
+        pass
 
 app = FastAPI()
+
+
+@app.exception_handler(UnicornException)
+async def unicorn_exception_handler(request: Request, exc: UnicornException):
+    return JSONResponse(
+        status_code=400,
+        content={"error": True, "number": "alphabet"},
+    )
 
 
 # Helper Functions
@@ -21,6 +35,7 @@ def is_armstrong(n: int) -> bool:
     digits = [int(d) for d in str(abs(n))]  # Handle negative numbers correctly
     return sum(d ** len(digits) for d in digits) == abs(n)
 
+
 def get_fun_fact(n: int) -> str:
     try:
         response = requests.get(f"http://numbersapi.com/{n}/math?json")
@@ -32,32 +47,36 @@ def get_fun_fact(n: int) -> str:
 
 # API Endpoint
 @app.get("/api/classify-number/")
-def classify_number(number: Union[int, float] = Query(..., description="The number to classify")):
+def classify_number(number = None):
+    print(number)
+    if not number:
+         raise UnicornException()
+       #  return {"error": True, "message": "number is required"}
+    
     try:
-        number = float(number)  # Ensure number is float/int
-        if number.is_integer():
-            number = int(number)  # Convert to int if it's a whole number
-        else:
-            raise HTTPException(status_code=400, detail="Only integers are allowed")
-
+        converted_number = int(number)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid input. Please provide a valid number.")
+        raise UnicornException()
+#          raise HTTPException(
+#           status_code=400,
+#            detail={"error": True, "number": "alphabet"}
+#        )
 
     properties = []
-    if is_armstrong(number):
+    if is_armstrong(converted_number):
         properties.append("armstrong")
-    properties.append("odd" if number % 2 else "even")
+    properties.append("odd" if converted_number % 2 else "even")
 
     return {
         "number": number,
-        "is_prime": is_prime(number),
-        "is_perfect": is_perfect(number),
+        "is_prime": is_prime(converted_number),
+        "is_perfect": is_perfect(converted_number),
         "properties": properties,
-        "digit_sum": sum(int(digit) for digit in str(abs(number)) if digit.isdigit()),
-        "fun_fact": get_fun_fact(number),
+        "digit_sum": sum(int(digit) for digit in str(abs(converted_number)) if digit.isdigit()),
+        "fun_fact": get_fun_fact(converted_number),
     }
 
 # Run Server
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=5000)
